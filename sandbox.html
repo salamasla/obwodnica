@@ -1,0 +1,47 @@
+<canvas id="screen"></canvas>
+
+<script src="lib/opencv.js" type="text/javascript"></script>
+<script type="text/javascript">
+	async function loadImg(buffer) {
+		return new Promise((res, rej) => {
+			const img = new Image();
+			img.src = buffer;
+			img.onload = () => res(img);
+			img.onerror = () => rej(new Error('Could not load image'));
+		});
+	}
+
+	function getRNG(min, max) {
+		return Math.floor(Math.random() * (max - min + 1) + min)
+	}
+
+	window.addEventListener('message', async (ev) => {
+		const srcImg = await loadImg(ev.data);
+		const src = cv.imread(srcImg);
+		const templImg = await loadImg('./templ.png')
+		const templ = cv.imread(templImg);
+
+		let dst = new cv.Mat();
+		let mask = new cv.Mat();
+		cv.matchTemplate(src, templ, dst, cv.TM_CCOEFF, mask);
+		
+		let result = cv.minMaxLoc(dst, mask);
+		let maxPoint = result.maxLoc;	
+
+		let color = new cv.Scalar(255, 0, 0, 255);
+		let point = new cv.Point(maxPoint.x + templ.cols, maxPoint.y + templ.rows);
+		// let point = new cv.Point(maxPoint.x+50+getRNG(-10, 10), maxPoint.y+70+getRNG(-5, 5));
+		cv.rectangle(src, maxPoint, point, color, 2, cv.LINE_8, 0);
+		cv.rectangle(src, new cv.Point(10, 10), new cv.Point(220, 100), color, 2, cv.LINE_8, 0);
+		
+		cv.imshow('screen', src);
+		src.delete(); dst.delete(); mask.delete();
+
+		const afkResult = {
+			x: maxPoint.x < 160 ? 0 : maxPoint.x+50+getRNG(-10, 10),
+			y: maxPoint.y < 90  ? 0 : maxPoint.y+70+getRNG(-4, 4),
+		}
+
+		ev.source.postMessage(afkResult, ev.origin);
+	});
+</script>
